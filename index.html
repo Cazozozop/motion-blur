@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Motion Blur - Avant / Après</title>
+  <style>
+    body {
+      background: #111;
+      color: #fff;
+      font-family: sans-serif;
+      text-align: center;
+      padding: 20px;
+    }
+
+    video, canvas {
+      width: 640px;
+      max-width: 100%;
+      border: 2px solid #fff;
+      margin-top: 20px;
+    }
+
+    #controls {
+      margin-top: 20px;
+    }
+
+    #slider {
+      width: 300px;
+    }
+
+    button {
+      margin: 10px;
+      padding: 10px 20px;
+      background-color: #333;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background-color: #555;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Motion Blur - Avant / Après</h1>
+  <input type="file" id="videoInput" accept="video/mp4,video/quicktime"><br>
+
+  <div id="controls" style="display:none;">
+    <label>Motion Blur :</label>
+    <input type="range" id="slider" min="0" max="20" value="0">
+    <button id="beforeAfterBtn">Afficher : AVANT</button>
+    <button id="downloadBtn">Télécharger vidéo floutée</button>
+  </div>
+
+  <video id="video" controls style="display:none;"></video>
+  <canvas id="canvas" style="display:none;"></canvas>
+
+  <script>
+    const videoInput = document.getElementById('videoInput');
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const slider = document.getElementById('slider');
+    const beforeAfterBtn = document.getElementById('beforeAfterBtn');
+    const downloadBtn = document.getElementById('downloadBtn');
+    const controls = document.getElementById('controls');
+
+    let showAfter = false;
+    let blurAmount = 0;
+    let recording = false;
+
+    videoInput.addEventListener('change', e => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const url = URL.createObjectURL(file);
+      video.src = url;
+      video.style.display = "block";
+      controls.style.display = "block";
+    });
+
+    slider.addEventListener('input', () => {
+      blurAmount = parseInt(slider.value);
+    });
+
+    beforeAfterBtn.addEventListener('click', () => {
+      showAfter = !showAfter;
+      beforeAfterBtn.textContent = showAfter ? 'Afficher : APRÈS' : 'Afficher : AVANT';
+      video.style.display = showAfter ? "none" : "block";
+      canvas.style.display = showAfter ? "block" : "none";
+    });
+
+    video.addEventListener('play', () => {
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      drawToCanvas();
+    });
+
+    function drawToCanvas() {
+      if (video.paused || video.ended) return;
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.filter = `blur(${blurAmount}px)`;
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      requestAnimationFrame(drawToCanvas);
+    }
+
+    downloadBtn.addEventListener('click', () => {
+      if (recording) return;
+
+      recording = true;
+      const stream = canvas.captureStream(30); // 30 FPS
+      const recorder = new MediaRecorder(stream);
+      const chunks = [];
+
+      recorder.ondataavailable = e => {
+        if (e.data.size > 0) chunks.push(e.data);
+      };
+
+      recorder.onstop = () => {
+        const blob = new Blob(chunks, { type: 'video/webm' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'video-floutee.webm';
+        a.click();
+        recording = false;
+      };
+
+      video.currentTime = 0;
+      video.play();
+      showAfter = true;
+      canvas.style.display = "block";
+      video.style.display = "none";
+
+      recorder.start();
+
+      video.onended = () => {
+        recorder.stop();
+        video.onended = null;
+      };
+    });
+  </script>
+
+</body>
+</html>
